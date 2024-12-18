@@ -29,7 +29,7 @@ DracoSoft Server is a modular, event-driven game server framework written in Pyt
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-repo/dracosoft-server.git
+git clone https://github.com/djames1987/DracoSoft-Server.git
 cd dracosoft-server
 ```
 
