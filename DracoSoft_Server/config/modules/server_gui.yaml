@@ -1,0 +1,58 @@
+# config/modules/server_gui.yaml
+enabled: true
+auto_load: true
+
+# Window settings
+window:
+  title: "DracoSoft Server Manager"
+  min_width: 800
+  min_height: 600
+  start_maximized: false
+  remember_size: true
+  remember_position: true
+
+# Update intervals (in milliseconds)
+refresh:
+  status_interval: 1000    # How often to refresh module status
+  logs_interval: 2000      # How often to refresh logs
+  stats_interval: 5000     # How often to refresh statistics
+
+# Theme settings
+theme:
+  dark_mode: true
+  colors:
+    background: "#2b2b2b"
+    foreground: "#ffffff"
+    accent: "#0066cc"
+    accent_hover: "#0077ee"
+    accent_pressed: "#0055bb"
+    error: "#ff4444"
+    success: "#00cc00"
+    warning: "#ffaa00"
+  fonts:
+    main:
+      family: "Segoe UI"
+      size: 10
+    monospace:
+      family: "Consolas"
+      size: 10
+
+# Logging
+logging:
+  max_entries: 1000       # Maximum number of log entries to keep in view
+  default_level: "INFO"   # Default log level filter
+  auto_scroll: true       # Auto-scroll logs to bottom
+
+# Feature toggles
+features:
+  show_logs: true
+  show_stats: true
+  allow_shutdown: true
+  allow_restart: true
+  confirm_actions: true   # Show confirmation dialogs for important actions
+
+# Shortcuts
+shortcuts:
+  refresh: "F5"
+  quit: "Ctrl+Q"
+  clear_logs: "Ctrl+L"

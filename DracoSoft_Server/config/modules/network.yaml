@@ -1,0 +1,15 @@
+enabled: true
+auto_load: true
+settings:
+  compression:
+    enabled: true
+    threshold_bytes: 1024
+    compression_level: 6
+    min_compression_ratio: 0.8
+  heartbeat:
+    enabled: true
+    interval: 30
+    timeout: 90
+  buffer_sizes:
+    read: 8192
+    write: 8192

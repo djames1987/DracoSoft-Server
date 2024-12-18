@@ -1,0 +1,41 @@
+# config/modules/sqlite.yaml
+enabled: true
+auto_load: true
+database:
+  # Database file path (relative to server root)
+  path: "data/server.db"
+  # Database connection settings
+  connection:
+    timeout: 30
+    isolation_level: "DEFERRED"  # DEFERRED, IMMEDIATE, or EXCLUSIVE
+    journal_mode: "WAL"         # DELETE, TRUNCATE, PERSIST, MEMORY, WAL, or OFF
+
+  # Pool settings
+  pool:
+    max_connections: 10
+    connection_timeout: 30
+
+  # Backup settings
+  backup:
+    enabled: true
+    interval: 86400    # Backup interval in seconds (24 hours)
+    keep_days: 7       # Number of days to keep backups
+    path: "data/backups"
+
+  # Performance settings
+  performance:
+    cache_size: -2000  # Cache size in KB (negative means number of pages)
+    page_size: 4096    # Database page size in bytes
+    busy_timeout: 5000 # Busy timeout in milliseconds
+
+  # Security settings
+  security:
+    encrypt_db: false  # Whether to encrypt the database file
+    key_file: null     # Path to encryption key file if encryption is enabled
+
+# Logging settings specific to SQLite module
+logging:
+  level: "INFO"
+  file_operations: true    # Log file operations
+  query_timing: true       # Log query execution times
+  slow_query_threshold: 1.0  # Log queries taking longer than this many seconds

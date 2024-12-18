@@ -1,0 +1,83 @@
+# config/modules/user_management.yaml
+enabled: true
+auto_load: true
+
+# User account settings
+account:
+  # Username requirements
+  username:
+    min_length: 3
+    max_length: 32
+    allowed_chars: "a-zA-Z0-9_-"  # Regex pattern for allowed characters
+    reserved_names: ["admin", "system", "server"]
+    case_sensitive: false
+
+  # Password requirements
+  password:
+    min_length: 8
+    max_length: 128
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special: true
+    special_chars: "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    prevent_common: true  # Prevent common passwords
+    max_failed_attempts: 5
+    lockout_duration: 1800  # 30 minutes in seconds
+
+  # Email settings
+  email:
+    required: true
+    verify: true
+    allowed_domains: []  # Empty means all domains allowed
+    max_per_domain: 5   # Maximum accounts per email domain
+
+# User statuses and roles
+status:
+  types: ["active", "inactive", "suspended", "banned"]
+  default: "active"
+
+roles:
+  available: ["user", "moderator", "admin"]
+  default: "user"
+  hierarchy:
+    admin: 100
+    moderator: 50
+    user: 1
+
+# Security settings
+security:
+  hash_algorithm: "sha256"
+  salt_length: 32
+  password_history: 5  # Remember last 5 passwords
+  force_password_change: 90  # Days before requiring password change
+  session_timeout: 3600  # 1 hour in seconds
+
+# Rate limiting
+rate_limit:
+  create_account:
+    max_per_hour: 3
+    max_per_day: 10
+  password_reset:
+    max_per_hour: 3
+    max_per_day: 5
+
+# Cleanup settings
+cleanup:
+  inactive_accounts:
+    enabled: true
+    after_days: 365  # Clean up accounts inactive for 1 year
+    action: "deactivate"  # or "delete"
+  failed_logins:
+    reset_after: 3600  # Reset failed login count after 1 hour
+    cleanup_after: 86400  # Remove failed login records after 24 hours
+
+# Logging settings
+logging:
+  level: "INFO"
+  events:
+    account_creation: true
+    login_attempts: true
+    password_changes: true
+    status_changes: true
+    role_changes: true

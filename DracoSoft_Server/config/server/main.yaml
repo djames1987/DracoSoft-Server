@@ -1,0 +1,44 @@
+# Main server configuration
+
+# Module configuration
+modules:
+  # Module name mappings
+  mapping:
+    network: "network_module"
+    sqlite: "sqlite_module"
+    user_management: "user_management_module"
+    authorization: "authorization_module"
+    flask: "flask_module"
+    ServerGui: 'server_gui_module'
+    # admin: "admin_console"
+
+  # Module loading order
+  load_order:
+    - "network"
+    - "sqlite"
+    - "user_management"
+    - "authorization"
+    - "flask"
+    - "ServerGui"
+    # - "admin"
+
+  # Module shutdown order (reverse of load order by default)
+  shutdown_order:
+    - "authorization_module"
+    - "user_management_module"
+    - "flask"
+    - "sqlite_module"
+    - "network_module"
+    - "ServerGui"
+    # - "admin"
+
+# Directory paths (relative to server root)
+directories:
+  config: "config"
+  modules: "modules"
+  logs: "logs"
+  data: "data"
+
+# Server settings
+server:
+  tick_rate: 1  # Server tick rate in seconds

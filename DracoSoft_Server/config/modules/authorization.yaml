@@ -1,0 +1,6 @@
+enabled: true
+auto_load: true
+settings:
+  session_timeout: 86400  # 24 hours in seconds
+  cleanup_interval: 300   # Cleanup runs every 5 minutes
+  max_login_attempts: 3

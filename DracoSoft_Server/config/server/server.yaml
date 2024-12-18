@@ -1,0 +1,24 @@
+# config/server/server.yaml
+network:
+  host: "0.0.0.0"
+  port: 8889  # Changed from 8888 to avoid conflicts
+  max_connections: 1000
+  connection_timeout: 30
+  fallback_ports: [8890, 8891, 8892]  # Fallback ports if primary is unavailable
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "server.log"
+
+performance:
+  tick_rate: 60
+  max_message_size: 1048576  # 1MB
+  message_queue_size: 1000
+
+security:
+  max_login_attempts: 3
+  session_timeout: 3600  # 1 hour
+  rate_limit:
+    messages_per_second: 10
+    burst_size: 20
