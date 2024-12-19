@@ -2,15 +2,20 @@
 enabled: true
 auto_load: true
 
-# Flask server settings
-port: 5000
+# Global settings
+default_port: 5000  # Starting port for automatic port assignment
 health_check_interval: 30  # seconds
-max_restart_attempts: 3
-
-# Security settings
-allowed_origins: ["http://localhost:3000"]
-cors_enabled: true
 
 # Resource limits
 max_requests_per_minute: 600
 timeout: 30  # seconds
+
+# Default apps configuration
+apps:
+  system:  # Default system app for basic health checks
+    port: 5001
+    enabled: true
+
+# Security settings
+allowed_origins: ["http://localhost:3000"]
+cors_enabled: true

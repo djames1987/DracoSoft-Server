@@ -1,59 +1,133 @@
 import asyncio
-import subprocess
-import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
-
-import psutil
-import requests
+from typing import Optional, Dict, Any, List
+import logging
+from flask import Flask, Blueprint
+from werkzeug.serving import make_server
+import threading
+import time
 
 from DracoSoft_Server.core.baseModule import BaseModule, ModuleInfo, ModuleState
 from DracoSoft_Server.core.moduleEventSystem import Event, EventTypes, EventPriority
 
 
+class FlaskAppManager:
+    """Manages a single Flask application instance."""
+
+    def __init__(self, name: str, port: int, logger: logging.Logger):
+        self.name = name
+        self.port = port
+        self.logger = logger
+        self.app = Flask(name)
+        self.server = None
+        self.thread = None
+        self._is_running = False
+        self.blueprints: Dict[str, Blueprint] = {}
+
+    def add_blueprint(self, blueprint: Blueprint, url_prefix: str = None) -> None:
+        """Register a blueprint with this Flask app."""
+        self.blueprints[blueprint.name] = blueprint
+        self.app.register_blueprint(blueprint, url_prefix=url_prefix)
+        self.logger.info(f"Registered blueprint '{blueprint.name}' for app '{self.name}'")
+
+    def remove_blueprint(self, blueprint_name: str) -> None:
+        """Remove a blueprint from this Flask app."""
+        if blueprint_name in self.blueprints:
+            # Flask doesn't support unregistering blueprints, so we'll need to recreate the app
+            self.app = Flask(self.name)
+            for name, bp in self.blueprints.items():
+                if name != blueprint_name:
+                    self.app.register_blueprint(bp)
+            del self.blueprints[blueprint_name]
+            self.logger.info(f"Removed blueprint '{blueprint_name}' from app '{self.name}'")
+
+    def start(self) -> bool:
+        """Start the Flask application in a separate thread."""
+        try:
+            if self._is_running and self.thread and self.thread.is_alive():
+                self.logger.debug(f"App '{self.name}' is already running")
+                return True
+
+            # Stop any existing server/thread
+            self.stop()
+
+            self.server = make_server('0.0.0.0', self.port, self.app)
+            self.thread = threading.Thread(target=self.server.serve_forever)
+            self.thread.daemon = True
+            self.thread.start()
+
+            # Give the server a moment to start
+            time.sleep(0.5)
+
+            if self.thread.is_alive():
+                self._is_running = True
+                self.logger.info(f"Started Flask app '{self.name}' on port {self.port}")
+                return True
+            else:
+                self.logger.error(f"Failed to start Flask app '{self.name}' - thread died immediately")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Error starting Flask app '{self.name}': {e}")
+            self._is_running = False
+            self.thread = None
+            self.server = None
+            return False
+
+    def stop(self) -> None:
+        """Stop the Flask application."""
+        try:
+            if self.server:
+                self.server.shutdown()
+            if self.thread and self.thread.is_alive():
+                self.thread.join(timeout=5.0)  # Wait up to 5 seconds for the thread to finish
+                if self.thread.is_alive():
+                    self.logger.warning(f"Thread for app '{self.name}' didn't stop cleanly")
+            self._is_running = False
+            self.thread = None
+            self.server = None
+            self.logger.info(f"Stopped Flask app '{self.name}'")
+        except Exception as e:
+            self.logger.error(f"Error stopping Flask app '{self.name}': {e}")
+            self._is_running = False
+            self.thread = None
+            self.server = None
+
+    @property
+    def is_running(self) -> bool:
+        return self._is_running and self.thread and self.thread.is_alive()
+
+
 class FlaskModule(BaseModule):
     """
-    Module to manage a Flask application in a separate process.
-    Handles starting, stopping, and monitoring the Flask server.
+    Enhanced Flask module that supports multiple Flask applications.
+    Each application can have its own port, blueprints, and configuration.
     """
 
     def __init__(self, server):
         super().__init__(server)
-
         self.module_info = ModuleInfo(
             name="Flask",
-            version="1.0.0",
-            description="Flask server process manager",
+            version="1.1.0",
+            description="Multi-app Flask server manager",
             author="DracoSoft",
             dependencies=[]
         )
 
-        self.process: Optional[subprocess.Popen] = None
-        self.flask_port: int = 5000
-        self.health_check_interval: int = 30
+        self.apps: Dict[str, FlaskAppManager] = {}
+        self.default_port = 5000
         self._health_check_task: Optional[asyncio.Task] = None
-        self._process_monitor_task: Optional[asyncio.Task] = None
-        self.flask_script_path: Path = Path(__file__).parent / "flask_server.py"
-        self.restart_attempts = 0
-        self.max_restart_attempts = 3
 
     async def load(self) -> bool:
         """Load the Flask module."""
         try:
-            # Validate Flask script exists
-            if not self.flask_script_path.exists():
-                raise FileNotFoundError(f"Flask script not found: {self.flask_script_path}")
-
             # Get configuration
-            self.flask_port = self.config.get('port', 5000)
-            self.health_check_interval = self.config.get('health_check_interval', 30)
-            self.max_restart_attempts = self.config.get('max_restart_attempts', 3)
+            self.default_port = self.config.get('default_port', 5000)
 
             # Register event handlers
-            self.server.event_manager.register_handler(
+            self.register_event_handler(
                 EventTypes.CLIENT_MESSAGE.value,
                 self._handle_client_message,
-                self.module_info.name,
                 EventPriority.NORMAL
             )
 
@@ -66,16 +140,56 @@ class FlaskModule(BaseModule):
             self.state = ModuleState.ERROR
             return False
 
+    def create_app(self, name: str, port: Optional[int] = None) -> FlaskAppManager:
+        """Create a new Flask application instance."""
+        if name in self.apps:
+            raise ValueError(f"App '{name}' already exists")
+
+        # Find available port if none specified
+        if port is None:
+            port = self._find_available_port()
+
+        app_manager = FlaskAppManager(name, port, self.logger)
+        self.apps[name] = app_manager
+        self.logger.info(f"Created Flask app '{name}' on port {port}")
+        return app_manager
+
+    def _find_available_port(self) -> int:
+        """Find an available port starting from default_port."""
+        used_ports = {app.port for app in self.apps.values()}
+        port = self.default_port
+        while port in used_ports:
+            port += 1
+        return port
+
+    def get_app(self, name: str) -> Optional[FlaskAppManager]:
+        """Get a Flask application by name."""
+        return self.apps.get(name)
+
     async def enable(self) -> bool:
-        """Enable the Flask module and start the Flask server process."""
+        """Enable the Flask module and start all applications."""
         try:
-            # Start Flask process
-            if not await self._start_flask_server():
+            if not await self.validate_dependencies():
                 return False
 
-            # Start monitoring tasks
+            # Create and start system app if configured
+            if self.config.get('apps', {}).get('system', {}).get('enabled', True):
+                system_app = self.create_app('system', self.config.get('apps', {}).get('system', {}).get('port', 5001))
+                if not system_app.start():
+                    self.logger.error("Failed to start system app")
+                    return False
+
+            # Start all registered apps
+            for app_name, app in self.apps.items():
+                self.logger.info(f"Starting Flask app '{app_name}'")
+                if not app.start():
+                    self.logger.error(f"Failed to start app '{app_name}'")
+                    return False
+                else:
+                    self.logger.info(f"Successfully started app '{app_name}'")
+
+            # Start health check task
             self._health_check_task = asyncio.create_task(self._health_check_loop())
-            self._process_monitor_task = asyncio.create_task(self._monitor_process())
 
             self.state = ModuleState.ENABLED
             self.logger.info("Flask module enabled")
@@ -86,16 +200,13 @@ class FlaskModule(BaseModule):
             return False
 
     async def disable(self) -> bool:
-        """Disable the Flask module and stop the Flask server."""
+        """Disable the Flask module and stop all applications."""
         try:
-            # Cancel monitoring tasks
             if self._health_check_task:
                 self._health_check_task.cancel()
-            if self._process_monitor_task:
-                self._process_monitor_task.cancel()
 
-            # Stop Flask server
-            await self._stop_flask_server()
+            for app in self.apps.values():
+                app.stop()
 
             self.state = ModuleState.DISABLED
             self.logger.info("Flask module disabled")
@@ -111,10 +222,8 @@ class FlaskModule(BaseModule):
             if self.is_enabled:
                 await self.disable()
 
-            self.server.event_manager.unregister_all_handlers(self.module_info.name)
-
+            self.apps.clear()
             self.state = ModuleState.UNLOADED
-            await self._stop_flask_server()
             self.logger.info("Flask module unloaded")
             return True
 
@@ -122,166 +231,42 @@ class FlaskModule(BaseModule):
             self.logger.error(f"Failed to unload Flask module: {e}")
             return False
 
-    async def _start_flask_server(self) -> bool:
-        """Start the Flask server process."""
-        try:
-            # Ensure old process is stopped
-            await self._stop_flask_server()
-
-            # Prepare log path
-            log_path = Path("logs/flask_app.log")
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Start Flask process
-            self.process = subprocess.Popen([
-                sys.executable,
-                str(self.flask_script_path),
-                str(self.flask_port),
-                str(log_path)
-            ])
-
-            # Wait for server to start
-            for _ in range(10):  # Try for 10 seconds
-                try:
-                    response = requests.get(f"http://localhost:{self.flask_port}/health")
-                    if response.status_code == 200:
-                        self.logger.info(f"Flask server started on port {self.flask_port}")
-                        self.restart_attempts = 0
-                        return True
-                except requests.RequestException:
-                    await asyncio.sleep(1)
-
-            raise TimeoutError("Flask server failed to start")
-
-        except Exception as e:
-            self.logger.error(f"Error starting Flask server: {e}")
-            return False
-
-    async def _stop_flask_server(self) -> None:
-        """Stop the Flask server process."""
-        if self.process:
-            try:
-                # Try graceful shutdown first
-                parent = psutil.Process(self.process.pid)
-                children = parent.children(recursive=True)
-
-                for child in children:
-                    child.terminate()
-                parent.terminate()
-
-                # Wait for processes to terminate
-                gone, alive = psutil.wait_procs([parent] + children, timeout=3)
-
-                # Force kill if still alive
-                for p in alive:
-                    p.kill()
-
-            except psutil.NoSuchProcess:
-                pass
-            except Exception as e:
-                self.logger.error(f"Error stopping Flask server: {e}")
-            finally:
-                self.process = None
-
     async def _health_check_loop(self) -> None:
-        """Periodically check Flask server health."""
+        """Monitor the health of all Flask applications."""
         while True:
             try:
-                await asyncio.sleep(self.health_check_interval)
+                await asyncio.sleep(30)  # Check every 30 seconds
+                for app in self.apps.values():
+                    if not app.is_running:
+                        self.logger.warning(f"App '{app.name}' is not running, attempting restart")
+                        app.start()
 
-                if not self.process:
-                    continue
-
-                response = requests.get(f"http://localhost:{self.flask_port}/health")
-                if response.status_code != 200:
-                    self.logger.warning("Flask server health check failed")
-                    await self._handle_server_failure()
-
-            except requests.RequestException:
-                self.logger.warning("Flask server not responding")
-                await self._handle_server_failure()
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self.logger.error(f"Error in health check: {e}")
 
-    async def _monitor_process(self) -> None:
-        """Monitor the Flask process for unexpected termination."""
-        while True:
-            try:
-                await asyncio.sleep(1)
-
-                if self.process and self.process.poll() is not None:
-                    self.logger.warning("Flask process terminated unexpectedly")
-                    await self._handle_server_failure()
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                self.logger.error(f"Error monitoring process: {e}")
-
-    async def _handle_server_failure(self) -> None:
-        """Handle Flask server failures."""
-        self.restart_attempts += 1
-
-        if self.restart_attempts <= self.max_restart_attempts:
-            self.logger.info(f"Attempting to restart Flask server (attempt {self.restart_attempts})")
-            await self._start_flask_server()
-        else:
-            self.logger.error("Max restart attempts reached")
-            # Could emit an event here to notify other modules
+    def get_status(self) -> Dict[str, Any]:
+        """Get module status and information."""
+        return {
+            'name': self.module_info.name,
+            'version': self.module_info.version,
+            'state': self.state.value,
+            'enabled': self.is_enabled,
+            'loaded': self.is_loaded,
+            'dependencies': self.module_info.dependencies,
+            'description': self.module_info.description,
+            'author': self.module_info.author,
+            'apps': {
+                name: {
+                    'running': app.is_running,
+                    'port': app.port,
+                    'blueprints': list(app.blueprints.keys())
+                }
+                for name, app in self.apps.items()
+            }
+        }
 
     async def _handle_client_message(self, event: Event) -> None:
-        """Handle client messages for Flask module control."""
-        try:
-            message = event.data.get('message', {})
-            client_id = event.data.get('client_id')
-
-            if message.get('type') != 'flask_control':
-                return
-
-            action = message.get('action')
-            response_data = {"success": False, "message": "Unknown action"}
-
-            if action == 'status':
-                response_data = await self._get_status()
-            elif action == 'restart':
-                success = await self._start_flask_server()
-                response_data = {
-                    "success": success,
-                    "message": "Server restarted" if success else "Restart failed"
-                }
-            elif action == 'stop':
-                await self._stop_flask_server()
-                response_data = {"success": True, "message": "Server stopped"}
-
-            # Send response
-            network_module = self.server.module_manager.modules.get('network_module')
-            if network_module:
-                await network_module.send_message(client_id, {
-                    "type": "flask_control_response",
-                    "data": response_data
-                })
-
-        except Exception as e:
-            self.logger.error(f"Error handling client message: {e}")
-
-    async def _get_status(self) -> Dict[str, Any]:
-        """Get Flask server status."""
-        try:
-            if not self.process:
-                return {"status": "stopped", "pid": None}
-
-            response = requests.get(f"http://localhost:{self.flask_port}/api/status")
-            return {
-                "success": True,
-                "data": response.json(),
-                "restart_attempts": self.restart_attempts
-            }
-        except Exception:
-            return {
-                "success": False,
-                "status": "error",
-                "pid": self.process.pid if self.process else None,
-                "restart_attempts": self.restart_attempts
-            }
+        """Handle client messages."""
+        pass  # Implement if needed

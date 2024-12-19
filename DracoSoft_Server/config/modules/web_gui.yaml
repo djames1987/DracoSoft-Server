@@ -1,0 +1,19 @@
+# config/modules/web_gui.yaml
+enabled: true
+auto_load: true
+
+# Server settings
+port: 5000  # Port for the Web GUI application
+
+# Security settings
+secret_key: "change-this-in-production"  # Used for JWT tokens
+token_expiry: 86400  # 24 hours in seconds
+
+# CORS settings
+allowed_origins:
+  - "http://localhost:5000"
+  - "http://localhost:3000"
+cors_enabled: true
+
+# Interface settings
+refresh_interval: 5000  # Module status refresh interval in milliseconds
