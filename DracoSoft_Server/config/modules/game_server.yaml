@@ -1,0 +1,203 @@
+# config/modules/game_server.yaml
+enabled: true
+auto_load: true
+
+# Game world settings
+world:
+  # Server settings
+  servers:
+    max_per_player: 10
+    home_server:
+      starting_cpu: 1
+      starting_memory: 32
+      max_cpu: 10
+      max_memory: 100
+    virtual_servers:
+      cost_multiplier: 1.5
+      upgrade_cooldown: 300  # 5 minutes in seconds
+
+  # Resource settings
+  resources:
+    cpu_upgrade_cost: 1000
+    memory_upgrade_cost: 500
+    resource_tick_rate: 60  # Updates per minute
+
+# Player settings
+players:
+  starting_balance: 5000
+  max_concurrent_sessions: 1
+  inventory_size: 100
+  session_timeout: 300  # 5 minutes of inactivity
+
+# Network settings
+network:
+  update_rate: 60  # State updates per second
+  broadcast_rate: 10  # Broadcast updates per second
+  max_message_size: 1048576  # 1MB
+  compression_threshold: 1024  # Compress messages larger than 1KB
+
+  # REST API settings
+  api_port: 5001  # Port for the game server API
+  api_host: "0.0.0.0"  # Listen on all interfaces
+  api_cors_enabled: true
+  api_cors_origins: ["http://localhost:3000"]
+  api_rate_limit: 1000  # Requests per minute
+  api_timeout: 30  # Request timeout in seconds
+
+# Security settings
+security:
+  max_commands_per_second: 10
+  command_burst_size: 20
+  required_auth: true
+  validate_actions: true
+
+# Data persistence
+data:
+  save_interval: 300  # Save game state every 5 minutes
+  backup_interval: 3600  # Backup every hour
+  max_backups: 24  # Keep 24 hourly backups
+  data_dir: "data/game"
+
+# Performance settings
+performance:
+  max_players_per_server: 100
+  max_total_players: 1000
+  cleanup_interval: 60  # Run cleanup every minute
+  max_server_load: 90  # Maximum CPU/Memory utilization percentage
+  tick_rate: 60  # Game logic updates per second
+  state_cache_size: 1000  # Number of game states to cache
+  async_tasks_limit: 1000  # Maximum concurrent async tasks
+
+# Game mechanics
+mechanics:
+  # Server upgrade mechanics
+  upgrades:
+    cpu:
+      levels: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+      cost_multiplier: 1.5
+      cooldown: 300  # 5 minutes between upgrades
+    memory:
+      levels: [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+      cost_multiplier: 1.5
+      cooldown: 300
+
+  # Script execution settings
+  scripting:
+    max_execution_time: 5  # Maximum script runtime in seconds
+    max_memory_usage: 100  # Maximum memory usage in MB
+    allowed_modules: ["math", "random", "time"]
+    blacklisted_functions: ["eval", "exec", "import", "open"]
+    sandbox_enabled: true
+
+  # Resource generation
+  resources:
+    base_generation_rate: 60  # Resources per minute
+    scaling_factor: 1.2  # Resource scaling with upgrades
+    max_storage: 10000
+    types:
+      - credits
+      - cpu_cycles
+      - memory_blocks
+      - network_tokens
+
+  # Achievement system
+  achievements:
+    enabled: true
+    categories:
+      - server_management
+      - scripting
+      - networking
+      - resource_management
+    broadcast_unlocks: true
+
+# Event system
+events:
+  # Server events
+  server:
+    broadcast_upgrades: true
+    broadcast_connections: true
+    broadcast_status_changes: true
+    log_all_events: true
+
+  # Player events
+  player:
+    broadcast_achievements: true
+    broadcast_level_ups: true
+    broadcast_high_scores: true
+    log_all_events: true
+
+  # System events
+  system:
+    log_performance_issues: true
+    log_security_events: true
+    broadcast_maintenance: true
+    notification_levels: ["info", "warning", "critical"]
+
+# Leaderboards
+leaderboards:
+  enabled: true
+  categories:
+    - total_resources
+    - server_count
+    - achievement_points
+    - script_efficiency
+  update_interval: 300  # Update every 5 minutes
+  display_limit: 100  # Top 100 players
+  reset_interval: 604800  # Weekly reset (in seconds)
+
+# Tutorial system
+tutorial:
+  enabled: true
+  required_for_new_players: true
+  stages:
+    - basic_navigation
+    - server_management
+    - scripting_basics
+    - networking_basics
+    - resource_management
+  skip_allowed: false
+  rewards_enabled: true
+
+# Anti-cheat measures
+anti_cheat:
+  enabled: true
+  measures:
+    rate_limiting: true
+    action_validation: true
+    resource_verification: true
+    script_validation: true
+  punishment:
+    warning_threshold: 3
+    temporary_ban_duration: 86400  # 24 hours in seconds
+    permanent_ban_threshold: 5
+
+# Monitoring and metrics
+monitoring:
+  enabled: true
+  metrics:
+    - player_count
+    - server_load
+    - resource_usage
+    - network_latency
+    - script_execution_time
+  alert_thresholds:
+    high_load: 80
+    critical_load: 95
+    high_latency: 1000  # ms
+  collection_interval: 60  # Collect metrics every minute
+  retention_period: 604800  # Keep metrics for 7 days
+
+# Debug settings
+debug:
+  enabled: false  # Enable only in development
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  features:
+    print_state_updates: false
+    log_all_commands: false
+    track_performance: true
+    memory_profiling: false
+  development_tools:
+    console_enabled: false
+    test_commands_enabled: false
+    instant_upgrades: false
+    infinite_resources: false

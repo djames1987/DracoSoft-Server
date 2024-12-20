@@ -10,6 +10,7 @@ modules:
     authorization: "authorization_module"
     flask: "flask_module"
     WebGUI: 'web_gui_module'
+    GameServer: 'game_server_module'
     #ServerGui: 'server_gui_module'
     # admin: "admin_console"
 
@@ -21,6 +22,7 @@ modules:
     - "authorization"
     - "flask"
     - "WebGUI"
+    - "GameServer"
     #- "ServerGui"
     # - "admin"
 
@@ -32,6 +34,7 @@ modules:
     - "sqlite_module"
     - "network_module"
     - "WebGUI"
+    - "GameServer"
     #- "ServerGui"
     # - "admin"
 

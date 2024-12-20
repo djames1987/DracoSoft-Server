@@ -133,6 +133,10 @@ class WebGUIModule(BaseModule):
             # Log shutdown initiation
             self.logger.info("Server shutdown initiated through Web GUI")
 
+            # Initiate server shutdown
+            asyncio.create_task(self.server.shutdown())
+            #self.server.shutdown()
+
             # Stop the Flask app first
             if self.app_manager:
                 self.app_manager.stop()
@@ -140,8 +144,7 @@ class WebGUIModule(BaseModule):
             # Set server running flag to False
             self.server.running = False
 
-            # Initiate server shutdown
-            asyncio.create_task(self.server.shutdown())
+
 
             self.logger.info("Server shutdown sequence completed")
 
